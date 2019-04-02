@@ -15,7 +15,7 @@ downloads/
 eggs/
 .eggs/
 .idea/
-pycache/
+__pycache__/
 lib/
 lib64/
 parts/

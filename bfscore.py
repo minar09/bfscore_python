@@ -6,6 +6,7 @@
 
 import cv2
 import numpy as np
+import math
 
 major = cv2.__version__.split('.')[0]     # Get opencv version
 bDebug = False
@@ -69,11 +70,11 @@ def bfscore(gtfile, prfile, threshold=2):
     m = np.max(classes)    # Get max of classes (number of classes)
     # Define bfscore variable (initialized with zeros)
     bfscores = np.zeros((m+1), dtype=float)
-    
+    areas_gt = np.zeros((m + 1), dtype=float)
+
     for i in range(m+1):
         bfscores[i] = np.nan
-        
-    areas_gt = []
+        areas_gt[i] = np.nan
 
     for target_class in classes:    # Iterate over classes
 
@@ -104,9 +105,11 @@ def bfscore(gtfile, prfile, threshold=2):
             print(contours_gt)
             
         # Get contour area of GT
-        area = cv2.contourArea(np.array(contours_gt))
-        print("\tArea:", area)
-        areas_gt.append(area)
+        if contours_gt:
+            area = cv2.contourArea(np.array(contours_gt))
+            areas_gt[target_class] = area
+
+        print("\tArea:", areas_gt[target_class])
 
         # Draw GT contours
         img = np.zeros_like(gt__)
@@ -164,13 +167,37 @@ def bfscore(gtfile, prfile, threshold=2):
     cv2.destroyAllWindows()
 
     # return bfscores[1:], np.sum(bfscores[1:])/len(classes[1:])    # Return bfscores, except for background, and per image score
-    return bfscores[1:], areas_gt    # Return bfscores, except for background
+    return bfscores[1:], areas_gt[1:]    # Return bfscores, except for background
 
 
 if __name__ == "__main__":
 
-    #score, areas_gt = bfscore('data/gt_1.png', 'data/crf_1.png', 2)    # Same classes
-    score, areas_gt = bfscore('data/gt_0.png', 'data/pred_0.png', 2)    # Different classes
+    # sample_gt = 'data/gt_1.png'
+    sample_gt = 'data/gt_0.png'
+
+    # sample_pred = 'data/crf_1.png'
+    sample_pred = 'data/pred_0.png'
+
+    score, areas_gt = bfscore(sample_gt, sample_pred, 2)    # Same classes
+    # score, areas_gt = bfscore(sample_gt, sample_pred, 2)    # Different classes
+
+    # gt_shape = cv2.imread('data/gt_1.png').shape
+    # print("Total area:", gt_shape[0] * gt_shape[1])
+
+    total_area = np.nansum(areas_gt)
+    print("GT area (except background):", total_area)
+    fw_bfscore = []
+    for each in zip(score, areas_gt):
+        if math.isnan(each[0]) or math.isnan(each[1]):
+            fw_bfscore.append(math.nan)
+        else:
+            fw_bfscore.append(each[0] * (each[1]/total_area))
+    print(fw_bfscore)
+
+    print("\n>>>>BFscore:\n")
     print("BFSCORE:", score)
     print("Per image BFscore:", np.nanmean(score))
-    print("Total area:", np.sum(areas_gt))
+
+    print("\n>>>>Weighted BFscore:\n")
+    print("Weighted-BFSCORE:", fw_bfscore)
+    print("Per image Weighted-BFscore:", np.nanmean(fw_bfscore))
