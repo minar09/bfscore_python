@@ -1,11 +1,8 @@
 # -*- coding:utf-8 -*-
 
-# bfscore: Contour/Boundary matching score for multi-class image segmentation #
-# Reference: Csurka, G., D. Larlus, and F. Perronnin. "What is a good evaluation measure for semantic segmentation?" Proceedings of the British Machine Vision Conference, 2013, pp. 32.1-32.11. #
-# Crosscheck: https://www.mathworks.com/help/images/ref/bfscore.html #
-
 import cv2
 import numpy as np
+from PIL import Image
 
 major = cv2.__version__.split('.')[0]     # Get opencv version
 bDebug = False
@@ -17,7 +14,8 @@ bDebug = False
 
 def calc_precision_recall(contours_a, contours_b, threshold):
 
-    top_count = 0
+    tp_cnt = 0
+    precision_recall = 0
 
     try:
         for b in range(len(contours_b)):
@@ -30,14 +28,14 @@ def calc_precision_recall(contours_a, contours_b, threshold):
                     (contours_a[a][1] - contours_b[b][1]) * \
                     (contours_a[a][1] - contours_b[b][1])
                 if dist < threshold*threshold:
-                    top_count = top_count + 1
+                    tp_cnt = tp_cnt + 1
                     break
 
-        precision_recall = top_count/len(contours_b)
-    except Exception as e:
+        precision_recall = tp_cnt/len(contours_b)
+    except:
         precision_recall = 0
 
-    return precision_recall, top_count, len(contours_b)
+    return precision_recall, tp_cnt, len(contours_b)
 
 
 """ computes the BF (Boundary F1) contour matching score between the predicted and GT segmentation """
@@ -53,37 +51,36 @@ def bfscore(gtfile, prfile, threshold=2):
 
     classes_gt = np.unique(gt_)    # Get GT classes
     classes_pr = np.unique(pr_)    # Get predicted classes
+    classes = None     # Final classes
 
     # Check classes from GT and prediction
     if not np.array_equiv(classes_gt, classes_pr):
-        print('Classes are not same! GT:', classes_gt, 'Pred:', classes_pr)
+        # print('Classes are not same! GT:', classes_gt, 'Pred:', classes_pr)
 
         classes = np.concatenate((classes_gt, classes_pr))
         classes = np.unique(classes)
         classes = np.sort(classes)
-        print('Merged classes :', classes)
+        # print('Merged classes :', classes)
     else:
-        print('Classes :', classes_gt)
+        # print('Classes :', classes_gt)
         classes = classes_gt    # Get matched classes
 
     m = np.max(classes)    # Get max of classes (number of classes)
     # Define bfscore variable (initialized with zeros)
     bfscores = np.zeros((m+1), dtype=float)
-    
-    for i in range(m+1):
+
+    for i in range(m + 1):
         bfscores[i] = np.nan
-        
-    areas_gt = []
 
-    for target_class in classes:    # Iterate over classes
+    for tgt_clazz in classes:    # Iterate over classes
 
-        if target_class == 0:     # Skip background
+        if tgt_clazz == 0:     # Skip background
             continue
 
-        print(">>> Calculate for class:", target_class)
+        # print(">>> Calculate for class:", tgt_clazz)
 
         gt = gt_.copy()
-        gt[gt != target_class] = 0
+        gt[gt != tgt_clazz] = 0
         # print(gt.shape)
 
         # contours는 point의 list형태.
@@ -102,20 +99,15 @@ def bfscore(gtfile, prfile, threshold=2):
         if bDebug:
             print('contours_gt')
             print(contours_gt)
-            
-        # Get contour area of GT
-        area = cv2.contourArea(np.array(contours_gt))
-        print("\tArea:", area)
-        areas_gt.append(area)
 
         # Draw GT contours
-        img = np.zeros_like(gt__)
+        # img = np.zeros_like(gt__)
         # print(img.shape)
-        img[gt == target_class, 0] = 128  # Blue
-        img = cv2.drawContours(img, contours, -1, (255, 0, 0), 1)
+        # img[gt == tgt_clazz, 0] = 128  # Blue
+        # img = cv2.drawContours(img, contours, -1, (255, 0, 0), 1)
 
         pr = pr_.copy()
-        pr[pr != target_class] = 0
+        pr[pr != tgt_clazz] = 0
         # print(pr.shape)
 
         # contours는 point의 list형태.
@@ -137,40 +129,110 @@ def bfscore(gtfile, prfile, threshold=2):
             print(contours_pr)
 
         # Draw predicted contours
-        img[pr == target_class, 2] = 128  # Red
-        img = cv2.drawContours(img, contours, -1, (0, 0, 255), 1)
+        # img[pr == tgt_clazz, 2] = 128  # Red
+        # img = cv2.drawContours(img, contours, -1, (0, 0, 255), 1)
 
         # 3. calculate
         precision, numerator, denominator = calc_precision_recall(
             contours_gt, contours_pr, threshold)    # Precision
-        print("\tprecision:", denominator, numerator)
+        # print("\tprecision:", denominator, numerator)
 
         recall, numerator, denominator = calc_precision_recall(
             contours_pr, contours_gt, threshold)    # Recall
-        print("\trecall:", denominator, numerator)
+        # print("\trecall:", denominator, numerator)
 
         f1 = 0
         try:
             f1 = 2*recall*precision/(recall + precision)    # F1 score
         except:
-            #f1 = 0
+            # f1 = 0
             f1 = np.nan
-        print("\tf1:", f1)
-        bfscores[target_class] = f1
+        # print("\tf1:", f1)
+        bfscores[tgt_clazz] = f1
 
-        cv2.imshow('image', img)
-        cv2.waitKey(1000)
+        # cv2.imshow('image', img)
+        # cv2.waitKey(1000)
 
     cv2.destroyAllWindows()
 
-    # return bfscores[1:], np.sum(bfscores[1:])/len(classes[1:])    # Return bfscores, except for background, and per image score
-    return bfscores[1:], areas_gt    # Return bfscores, except for background
+    return bfscores[1:]  # Return bfscores, except for background
+
+
+def fast_hist(a, b, n):
+    k = (a >= 0) & (a < n)
+    return np.bincount(n * a[k].astype(int) + b[k], minlength=n**2).reshape(n, n)
+
+
+def compute_hist(img_path, gt_path, num_classes=18):
+    hist = np.zeros((num_classes, num_classes))
+
+    try:
+        label = Image.open(gt_path)
+        label_array = np.array(label, dtype=np.int32)
+        image = Image.open(img_path)
+        image_array = np.array(image, dtype=np.int32)
+
+        gtsz = label_array.shape
+        imgsz = image_array.shape
+
+        if not gtsz == imgsz:
+            image = image.resize((gtsz[1], gtsz[0]), Image.ANTIALIAS)
+            image_array = np.array(image, dtype=np.int32)
+
+        hist += fast_hist(label_array, image_array, num_classes)
+    except Exception as err:
+        print(err)
+
+    return hist
+
+
+def show_result(hist, n_cl=18):
+    # Dressup 10K, 18 classes
+    classes = ['background', 'hat', 'hair', 'sunglasses', 'upperclothes', 'skirt', 'pants', 'dress',
+               'belt', 'leftShoe', 'rightShoe', 'face', 'leftLeg', 'rightLeg', 'leftArm', 'rightArm', 'bag', 'scarf']
+
+    # CFPD, 23 classes
+    if n_cl == 23:
+        classes = ['bk', 'T-shirt', 'bag', 'belt', 'blazer', 'blouse', 'coat', 'dress', 'face', 'hair',
+                   'hat', 'jeans', 'legging', 'pants', 'scarf', 'shoe', 'shorts', 'skin', 'skirt',
+                   'socks', 'stocking', 'sunglass', 'sweater']
+
+    # LIP, 20 classes
+    if n_cl == 20:
+        classes = ['background', 'hat', 'hair', 'glove', 'sunglasses', 'upperclothes',
+                   'dress', 'coat', 'socks', 'pants', 'jumpsuits', 'scarf', 'skirt',
+                   'face', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg', 'leftShoe',
+                   'rightShoe']
+
+    # num of correct pixels
+    num_cor_pix = np.diag(hist)
+    # num of gt pixels
+    num_gt_pix = hist.sum(1)
+
+    # @evaluation 3: mean IU & per-class IU
+    print('IoU for each class:')
+    union = num_gt_pix + hist.sum(0) - num_cor_pix
+	
+    for i in range(n_cl):
+        print('%-15s: %f' % (classes[i], num_cor_pix[i] / union[i]))
+    iu = num_cor_pix / (num_gt_pix + hist.sum(0) - num_cor_pix)
+    print('>>>', 'mean IoU', np.nanmean(iu))
 
 
 if __name__ == "__main__":
 
-    #score, areas_gt = bfscore('data/gt_1.png', 'data/crf_1.png', 2)    # Same classes
-    score, areas_gt = bfscore('data/gt_0.png', 'data/pred_0.png', 2)    # Different classes
-    print("BFSCORE:", score)
-    print("Per image BFscore:", np.nanmean(score))
-    print("Total area:", np.sum(areas_gt))
+    label_path = "gt_0.png"
+    pred_path = "pred_0.png"
+    n_classes = 18
+
+    # miou
+    val_hist = compute_hist(pred_path, label_path, n_classes)
+    show_result(val_hist, n_classes)
+
+    print('\n')
+
+    # bfscore
+    bfscores = bfscore(label_path, pred_path, 2)
+    print("BFScores:\n", bfscores)
+    mean_bfscore = np.nanmean(bfscores)
+    print("Mean score:", mean_bfscore)
