@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import bfscore
+import math
 
 major = cv2.__version__.split('.')[0]     # Get opencv version
 bDebug = False
@@ -84,6 +85,21 @@ if __name__ == "__main__":
 
     # bfscore
     bfscores, areas_gt = bfscore.bfscore(label_path, pred_path, 2)
-    print("BFScores:\n", bfscores)
-    mean_bfscore = np.nanmean(bfscores)
-    print("Mean score:", mean_bfscore)
+
+    print("\n>>>>BFscore:\n")
+    print("BFSCORE:", bfscores)
+    print("Per image BFscore:", np.nanmean(bfscores))
+
+    total_area = np.nansum(areas_gt)
+    # print("GT area (except background):", total_area)
+    fw_bfscore = []
+    for each in zip(bfscores, areas_gt):
+        if math.isnan(each[0]) or math.isnan(each[1]):
+            fw_bfscore.append(math.nan)
+        else:
+            fw_bfscore.append(each[0] * each[1])
+    # print(fw_bfscore)
+
+    print("\n>>>>Weighted BFscore:\n")
+    print("Weighted-BFSCORE:", fw_bfscore)
+    print("Per image Weighted-BFscore:", np.nansum(fw_bfscore)/total_area)
