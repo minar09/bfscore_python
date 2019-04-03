@@ -172,11 +172,11 @@ def bfscore(gtfile, prfile, threshold=2):
 
 if __name__ == "__main__":
 
-    # sample_gt = 'data/gt_1.png'
-    sample_gt = 'data/gt_0.png'
+    sample_gt = 'data/gt_1.png'
+    # sample_gt = 'data/gt_0.png'
 
-    # sample_pred = 'data/crf_1.png'
-    sample_pred = 'data/pred_0.png'
+    sample_pred = 'data/crf_1.png'
+    # sample_pred = 'data/pred_0.png'
 
     score, areas_gt = bfscore(sample_gt, sample_pred, 2)    # Same classes
     # score, areas_gt = bfscore(sample_gt, sample_pred, 2)    # Different classes
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         if math.isnan(each[0]) or math.isnan(each[1]):
             fw_bfscore.append(math.nan)
         else:
-            fw_bfscore.append(each[0] * (each[1]/total_area))
+            fw_bfscore.append(each[0] * each[1])
     print(fw_bfscore)
 
     print("\n>>>>BFscore:\n")
@@ -200,4 +200,4 @@ if __name__ == "__main__":
 
     print("\n>>>>Weighted BFscore:\n")
     print("Weighted-BFSCORE:", fw_bfscore)
-    print("Per image Weighted-BFscore:", np.nanmean(fw_bfscore))
+    print("Per image Weighted-BFscore:", np.nansum(fw_bfscore)/total_area)
