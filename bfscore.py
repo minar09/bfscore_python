@@ -15,30 +15,24 @@ bDebug = False
 """ For precision, contours_a==GT & contours_b==Prediction
     For recall, contours_a==Prediction & contours_b==GT """
 
-
 def calc_precision_recall(contours_a, contours_b, threshold):
+    x = contours_a
+    y = contours_b
 
-    top_count = 0
+    xx = np.array(x)
+    hits = []
+    for yrec in y:
+        d = np.square(xx[:,0] - yrec[0]) + np.square(xx[:,1] - yrec[1])
+        hits.append(np.any(d < threshold*threshold))
+    top_count = np.sum(hits)
 
     try:
-        for b in range(len(contours_b)):
-
-            # find the nearest distance
-            for a in range(len(contours_a)):
-                dist = (contours_a[a][0] - contours_b[b][0]) * \
-                    (contours_a[a][0] - contours_b[b][0])
-                dist = dist + \
-                    (contours_a[a][1] - contours_b[b][1]) * \
-                    (contours_a[a][1] - contours_b[b][1])
-                if dist < threshold*threshold:
-                    top_count = top_count + 1
-                    break
-
-        precision_recall = top_count/len(contours_b)
-    except Exception as e:
+        precision_recall = top_count / len(y)
+    except ZeroDivisionError:
         precision_recall = 0
 
-    return precision_recall, top_count, len(contours_b)
+    return precision_recall, top_count, len(y)
+
 
 
 """ computes the BF (Boundary F1) contour matching score between the predicted and GT segmentation """
@@ -103,7 +97,7 @@ def bfscore(gtfile, prfile, threshold=2):
         if bDebug:
             print('contours_gt')
             print(contours_gt)
-            
+
         # Get contour area of GT
         if contours_gt:
             area = cv2.contourArea(np.array(contours_gt))
